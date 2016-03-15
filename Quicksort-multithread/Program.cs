@@ -10,94 +10,109 @@ namespace Quicksort_multithread
 {
     class ThreadedQuickSort
     {
-        private List<int> array;
-        private int minIndex;
-        private static int[] resultingArray;
-        private uint parallelizationLevel;
+        private QuickSortThread qst;
 
-        public ThreadedQuickSort(List<int> array, int minIndex, uint parallelizationLevel = 10)
+        public ThreadedQuickSort(List<int> array, uint parallelizationLevel = 10)
         {
-            this.array = array;
-            this.minIndex = minIndex;
-            this.parallelizationLevel = parallelizationLevel;
-            if (resultingArray == null) resultingArray = new int[array.Count];
+            qst = new QuickSortThread(array, 0, parallelizationLevel);
         }
 
-        private void SortCore(List<int> array, int minIndex)
+        public int[] GetSorted()
         {
-            List<int> leftArray = new List<int>();
-            List<int> rightArray = new List<int>();
-            int midIndex = (array.Count - 1) / 2;
-            int midValue = array[midIndex];
+            return qst.GetSorted();
+        }
 
-            for (int i = 0; i < array.Count; i++)
+        private class QuickSortThread
+        {
+            private List<int> array;
+            private int minIndex;
+            private static int[] resultingArray;
+            private uint parallelizationLevel;
+
+            public QuickSortThread(List<int> array, int minIndex, uint parallelizationLevel = 10)
             {
-                if (i != midIndex)
+                this.array = array;
+                this.minIndex = minIndex;
+                this.parallelizationLevel = parallelizationLevel;
+                if (resultingArray == null) resultingArray = new int[array.Count];
+            }
+
+            private void SortCore(List<int> array, int minIndex)
+            {
+                List<int> leftArray = new List<int>();
+                List<int> rightArray = new List<int>();
+                int midIndex = (array.Count - 1) / 2;
+                int midValue = array[midIndex];
+
+                for (int i = 0; i < array.Count; i++)
                 {
-                    if (array[i] <= midValue)
+                    if (i != midIndex)
                     {
-                        leftArray.Add(array[i]);
+                        if (array[i] <= midValue)
+                        {
+                            leftArray.Add(array[i]);
+                        }
+                        else
+                        {
+                            rightArray.Add(array[i]);
+                        }
+                    }
+                }
+
+                resultingArray[minIndex + leftArray.Count] = midValue;
+
+                Thread leftNodeThread = null;
+                Thread rightNodeThread = null;
+                if (leftArray.Count > 1)
+                {
+                    if (parallelizationLevel == 0)
+                    {
+                        SortCore(leftArray, minIndex);
                     }
                     else
                     {
-                        rightArray.Add(array[i]);
+                        QuickSortThread processLeft = new QuickSortThread(leftArray, minIndex, parallelizationLevel - 1);
+                        leftNodeThread = new Thread(new ThreadStart(processLeft.Sort));
+                        leftNodeThread.Start();
                     }
                 }
-            }
-
-            resultingArray[minIndex + leftArray.Count] = midValue;
-
-            Thread leftNodeThread = null;
-            Thread rightNodeThread = null;
-            if (leftArray.Count > 1)
-            {
-                if(parallelizationLevel == 0)
+                else if (leftArray.Count == 1)
                 {
-                    SortCore(leftArray, minIndex);
+                    resultingArray[minIndex] = leftArray[0];
                 }
-                else
+
+                if (rightArray.Count > 1)
                 {
-                    ThreadedQuickSort processLeft = new ThreadedQuickSort(leftArray, minIndex, parallelizationLevel - 1);
-                    leftNodeThread = new Thread(new ThreadStart(processLeft.Sort));
-                    leftNodeThread.Start();
+                    if (parallelizationLevel == 0)
+                    {
+                        SortCore(rightArray, minIndex + leftArray.Count + 1);
+                    }
+                    else
+                    {
+                        QuickSortThread processRight = new QuickSortThread(rightArray, minIndex + leftArray.Count + 1, parallelizationLevel - 1);
+                        rightNodeThread = new Thread(new ThreadStart(processRight.Sort));
+                        rightNodeThread.Start();
+                    }
                 }
-            }
-            else if (leftArray.Count == 1)
-            {
-                resultingArray[minIndex] = leftArray[0];
-            }
-
-            if (rightArray.Count > 1)
-            {
-                if(parallelizationLevel == 0)
+                else if (rightArray.Count == 1)
                 {
-                    SortCore(rightArray, minIndex + leftArray.Count + 1);
+                    resultingArray[minIndex + leftArray.Count + 1] = rightArray[0];
                 }
-                else
-                {
-                    ThreadedQuickSort processRight = new ThreadedQuickSort(rightArray, minIndex + leftArray.Count + 1, parallelizationLevel - 1);
-                    rightNodeThread = new Thread(new ThreadStart(processRight.Sort));
-                    rightNodeThread.Start();
-                }
+
+                if (leftNodeThread != null) leftNodeThread.Join();
+                if (rightNodeThread != null) rightNodeThread.Join();
             }
-            else if (rightArray.Count == 1)
+
+            private void Sort()
             {
-                resultingArray[minIndex + leftArray.Count + 1] = rightArray[0];
+                SortCore(array, minIndex);
             }
 
-            if (leftNodeThread != null) leftNodeThread.Join();
-            if (rightNodeThread != null) rightNodeThread.Join();
-        }
-
-        private void Sort()
-        {
-            SortCore(array, minIndex);
-        }
-
-        public int[] GetSorted() 
-        {
-            this.Sort();
-            return resultingArray;
+            public int[] GetSorted()
+            {
+                this.Sort();
+                return resultingArray;
+            }
         }
     };
 
@@ -106,7 +121,7 @@ namespace Quicksort_multithread
         static void Main(string[] args)
         {
             List<int> inputList = new List<int> { 0, 3, 2, 7, 5, 11, 2, 8, 8 };
-            ThreadedQuickSort qSort = new ThreadedQuickSort(inputList, 0);
+            ThreadedQuickSort qSort = new ThreadedQuickSort(inputList);
             int[] resultsArray = qSort.GetSorted();
             for (int i = 0; i < resultsArray.Length; i++)
             {
